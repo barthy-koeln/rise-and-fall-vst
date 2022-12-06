@@ -5,11 +5,11 @@ cmake_minimum_required(VERSION 3.21)
 
 # Change this to the name of your plugin
 # This cannot have spaces (but PRODUCT_NAME can)
-set(PROJECT_NAME "Pamplejuce")
+set(PROJECT_NAME "RiseAndFall")
 
 # Set the plugin formats you'll be building here.
 # Valid formats: AAX Unity VST AU AUv3 Standalone
-set(FORMATS AU VST3 AUv3)
+set(FORMATS AU VST3 AUv3 Standalone)
 
 # Reads in VERSION file and sticks in it CURRENT_VERSION variable
 # Be sure the file has no newlines
@@ -39,34 +39,49 @@ option(JUCE_ENABLE_MODULE_SOURCE_GROUPS "Show all module sources in IDE projects
 # and `git submodule update --remote --merge` to keep it up to date
 # On Github Actions, it's managed by actions/checkout
 add_subdirectory(JUCE)
+add_subdirectory(soundtouch SoundTouch)
 
 # Check the readme at `docs/CMake API.md` in the JUCE repo for full config
 juce_add_plugin("${PROJECT_NAME}"
-    # VERSION ...                               # Set this if the plugin version is different to the project version
-    # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
-    # ICON_SMALL ...
-    COMPANY_NAME Pamplejuce
-    BUNDLE_ID com.pamplejuce.pamplejuce
-    # IS_SYNTH TRUE/FALSE                       # Is this a synth or an effect?
-    # NEEDS_MIDI_INPUT TRUE/FALSE               # Does the plugin need midi input?
-    # NEEDS_MIDI_OUTPUT TRUE/FALSE              # Does the plugin need midi output?
-    # IS_MIDI_EFFECT TRUE/FALSE                 # Is this plugin a MIDI effect?
-    # EDITOR_WANTS_KEYBOARD_FOCUS TRUE/FALSE    # Does the editor need keyboard focus?
-    COPY_PLUGIN_AFTER_BUILD TRUE # On MacOS, plugin will be copied to /Users/you/Library/Audio/Plug-Ins/
-    PLUGIN_MANUFACTURER_CODE Pamp               # This has to be one uppercase, rest lower for AU formats
-    PLUGIN_CODE P001                            # A unique four-character plugin id with at least one upper-case character
-    FORMATS "${FORMATS}"
-    PRODUCT_NAME "${PROJECT_NAME}")        # The name of the final executable, which can differ from the target name
+        # VERSION ...                               # Set this if the plugin version is different to the project version
+        # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
+        # ICON_SMALL ...
+        COMPANY_NAME barthy.koeln
+        BUNDLE_ID koeln.barthy.rise-and-fall
+        IS_SYNTH TRUE                               # Is this a synth or an effect?
+        NEEDS_MIDI_INPUT TRUE                       # Does the plugin need midi input?
+        # NEEDS_MIDI_OUTPUT TRUE/FALSE              # Does the plugin need midi output?
+        # IS_MIDI_EFFECT TRUE/FALSE                 # Is this plugin a MIDI effect?
+        # EDITOR_WANTS_KEYBOARD_FOCUS TRUE/FALSE    # Does the editor need keyboard focus?
+        COPY_PLUGIN_AFTER_BUILD TRUE # On MacOS, plugin will be copied to /Users/you/Library/Audio/Plug-Ins/
+        PLUGIN_MANUFACTURER_CODE Babo               # This has to be one uppercase, rest lower for AU formats
+        PLUGIN_CODE RiFa                            # A unique four-character plugin id with at least one upper-case character
+        FORMATS "${FORMATS}"
+        PRODUCT_NAME "Rise & Fall")        # The name of the final executable, which can differ from the target name
 
 # C++20 please
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 
+# "recompile with -fPIC" error message
+# https://stackoverflow.com/a/38297422/3808452
+# https://cliutils.gitlab.io/modern-cmake/chapters/features/small.html
+set_target_properties(SoundTouch PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+
 # Manually list all .h and .cpp files for the plugin
 set(SourceFiles
-    Source/PluginEditor.h
-    Source/PluginProcessor.h
-    Source/PluginEditor.cpp
-    Source/PluginProcessor.cpp)
+        Source/AudioBufferUtils.h
+        Source/CustomLookAndFeel.h
+        Source/GUIParams.h
+        Source/NoteLengthSlider.h
+        Source/PluginEditor.cpp
+        Source/PluginEditor.h
+        Source/PluginProcessor.h
+        Source/PluginProcessor.cpp
+        Source/SimplePositionOverlay.h
+        Source/SimpleThumbnailComponent.h
+        Source/SubProcessor.h
+        Source/SubProcessor.cpp)
 target_sources("${PROJECT_NAME}" PRIVATE ${SourceFiles})
 
 # No, we don't want our source buried in extra nested folders
@@ -76,7 +91,14 @@ set_target_properties("${PROJECT_NAME}" PROPERTIES FOLDER "")
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Source PREFIX "" FILES ${SourceFiles})
 
 # Setup our binary data as a target
-juce_add_binary_data(Assets SOURCES pamplejuce.png)
+juce_add_binary_data(Assets SOURCES
+        Resources/IR/empty_apartment_bedroom-48khz-norm-trim.wav
+        Resources/IR/nuclear_reactor_hall-48khz-norm-trim.wav
+        Resources/IR/st_georges-48khz-norm-trim.wav
+        Resources/IR/university_of_york_stairwell-48khz-norm-trim.wav
+        Resources/IR/warehouse-48khz-norm-trim.wav
+        Resources/IR/york_minster-48khz-norm-trim.wav
+        Resources/background.png)
 
 # Required for Linux happiness:
 # See https://forum.juce.com/t/loading-pytorch-model-using-binarydata/39997/2
@@ -88,41 +110,50 @@ set_target_properties(Assets PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 # The non-hacky way of doing this is via the global PREDEFINED_TARGETS_FOLDER property
 # However that doesn't seem to be working in Xcode
 # Not all plugin types (au, vst) available on each build type (win, macos, linux)
-foreach(target ${FORMATS} "All")
-    if(TARGET ${PROJECT_NAME}_${target})
+foreach (target ${FORMATS} "All")
+    if (TARGET ${PROJECT_NAME}_${target})
         set_target_properties(${PROJECT_NAME}_${target} PROPERTIES
-            # Tuck the actual plugin targets into a folder where they won't bother us
-            FOLDER "Targets"
+                # Tuck the actual plugin targets into a folder where they won't bother us
+                FOLDER "Targets"
 
-            # MacOS only: Sets the default executable that Xcode will open on build
-            # For this exact path to to work, manually build the AudioPluginHost.xcodeproj in the JUCE subdir
-            XCODE_SCHEME_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/extras/AudioPluginHost/Builds/MacOSX/build/Debug/AudioPluginHost.app"
+                # MacOS only: Sets the default executable that Xcode will open on build
+                # For this exact path to to work, manually build the AudioPluginHost.xcodeproj in the JUCE subdir
+                XCODE_SCHEME_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/extras/AudioPluginHost/Builds/MacOSX/build/Debug/AudioPluginHost.app"
 
-            # Let us build the target in Xcode
-            XCODE_GENERATE_SCHEME ON)
-    endif()
-endforeach()
+                # Let us build the target in Xcode
+                XCODE_GENERATE_SCHEME ON)
+    endif ()
+endforeach ()
 set_target_properties(Assets PROPERTIES FOLDER "Targets")
 
 # We'll need to link to these from our plugin as well as our tests
 set(JUCE_DEPENDENCIES
-    juce::juce_audio_utils)
+        juce::juce_dsp
+        juce::juce_core
+        juce::juce_events
+        juce::juce_gui_basics
+        juce::juce_audio_utils
+        juce::juce_audio_formats
+        juce::juce_audio_processors
+        )
 
 target_compile_definitions("${PROJECT_NAME}"
-    PUBLIC
-    # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
-    JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
-    JUCE_USE_CURL=0     # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
-    JUCE_VST3_CAN_REPLACE_VST2=0)
+        PUBLIC
+        # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
+        JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
+        JUCE_USE_CURL=0     # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
+        JUCE_VST3_CAN_REPLACE_VST2=0)
 
 target_link_libraries("${PROJECT_NAME}"
-    PRIVATE
-    Assets
-    ${JUCE_DEPENDENCIES}
-    PUBLIC
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
-    juce::juce_recommended_warning_flags)
+        PRIVATE
+        Assets
+        ${JUCE_DEPENDENCIES}
+        SoundTouch
+
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
 
 # Required for ctest (which is just easier for cross-platform CI)
 # include(CTest) does this too, but adds tons of targets we don't want
@@ -138,11 +169,11 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Tests PREFIX "" FILES ${TestFiles}
 # Use Catch2 v3 on the devel branch
 Include(FetchContent)
 FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_PROGRESS TRUE
-    GIT_SHALLOW TRUE
-    GIT_TAG v3.1.0)
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_PROGRESS TRUE
+        GIT_SHALLOW TRUE
+        GIT_TAG v3.1.0)
 FetchContent_MakeAvailable(Catch2) # find_package equivalent
 
 # Setup the test executable, again C++ 20 please
@@ -167,7 +198,7 @@ catch_discover_tests(Tests)
 
 # Color our warnings and errors
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-   add_compile_options (-fdiagnostics-color=always)
+    add_compile_options(-fdiagnostics-color=always)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-   add_compile_options (-fcolor-diagnostics)
+    add_compile_options(-fcolor-diagnostics)
 endif ()

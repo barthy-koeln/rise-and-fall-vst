@@ -2,3 +2,6 @@
 	path = JUCE
 	url = https://github.com/juce-framework/JUCE/
 	branch = develop
+[submodule "soundtouch"]
+	path = soundtouch
+	url = https://codeberg.org/soundtouch/soundtouch.git
